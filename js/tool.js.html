@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>tool.js - Documentation</title>
+    
+    
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+    <script src="scripts/nav.js" defer></script>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav >
+    
+    
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="GisMap.html">GisMap</a><ul class='methods'><li data-type='method'><a href="GisMap.html#activateMapMeasureTool">activateMapMeasureTool</a></li><li data-type='method'><a href="GisMap.html#closeInfoPopup">closeInfoPopup</a></li><li data-type='method'><a href="GisMap.html#deactivateMapMeasureTool">deactivateMapMeasureTool</a></li><li data-type='method'><a href="GisMap.html#destroy">destroy</a></li><li data-type='method'><a href="GisMap.html#generateBasemap">generateBasemap</a></li><li data-type='method'><a href="GisMap.html#getViewInfo">getViewInfo</a></li><li data-type='method'><a href="GisMap.html#getWindowCenterPosition">getWindowCenterPosition</a></li><li data-type='method'><a href="GisMap.html#setBasemapParams">setBasemapParams</a></li><li data-type='method'><a href="GisMap.html#zoomToHome">zoomToHome</a></li></ul></li><li><a href="LayerManager.html">LayerManager</a><ul class='methods'><li data-type='method'><a href="LayerManager.html#addLabelToLayer">addLabelToLayer</a></li><li data-type='method'><a href="LayerManager.html#addLayer">addLayer</a></li><li data-type='method'><a href="LayerManager.html#destroy">destroy</a></li><li data-type='method'><a href="LayerManager.html#getLayerVisible">getLayerVisible</a></li><li data-type='method'><a href="LayerManager.html#refreshLayer">refreshLayer</a></li><li data-type='method'><a href="LayerManager.html#removeLayer">removeLayer</a></li><li data-type='method'><a href="LayerManager.html#resetBillboardGeometry">resetBillboardGeometry</a></li><li data-type='method'><a href="LayerManager.html#resetBillboardStyle">resetBillboardStyle</a></li><li data-type='method'><a href="LayerManager.html#resetLabelGeometry">resetLabelGeometry</a></li><li data-type='method'><a href="LayerManager.html#resetLabelStyle">resetLabelStyle</a></li><li data-type='method'><a href="LayerManager.html#resetVectorGeometry">resetVectorGeometry</a></li><li data-type='method'><a href="LayerManager.html#resetVectorStyle">resetVectorStyle</a></li><li data-type='method'><a href="LayerManager.html#setLayerVisibility">setLayerVisibility</a></li><li data-type='method'><a href="LayerManager.html#showLayer">showLayer</a></li><li data-type='method'><a href="LayerManager.html#zoomToLayer">zoomToLayer</a></li></ul></li><li><a href="Tool.html">Tool</a><ul class='methods'><li data-type='method'><a href="Tool.html#centerToExtent">centerToExtent</a></li><li data-type='method'><a href="Tool.html#filterMapToolStyle">filterMapToolStyle</a></li><li data-type='method'><a href="Tool.html#.calculateAngle">calculateAngle</a></li><li data-type='method'><a href="Tool.html#.createCanvasLegend">createCanvasLegend</a></li><li data-type='method'><a href="Tool.html#.disposeFeature">disposeFeature</a></li><li data-type='method'><a href="Tool.html#.disposeLayer">disposeLayer</a></li><li data-type='method'><a href="Tool.html#.isClosed">isClosed</a></li></ul></li></ul>
+    
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">tool.js</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import P from './parameters';
+import { Style, Icon, Text, Fill } from 'ol/style';
+import { Point } from 'ol/geom';
+import * as olExtent from 'ol/extent';
+import VectorSource from 'ol/source/Vector';
+import LayerGroup from 'ol/layer/Group';
+import GisMap from './gisMap';
+
+/**
+ * 地图工具类
+ * @class
+ */
+class Tool {
+  /**
+   * 构造函数
+   * @param {GisMap} gisMap
+   */
+  constructor(gisMap) {
+    /**
+     * 地图对象
+     * @type {GisMap}
+     */
+    this.gisMap = gisMap;
+  }
+  /**
+   * 地图缩放至范围
+   * @param {Number[]} extent [minx, miny, maxx, maxy]
+   */
+  centerToExtent(extent) {
+    if (isFinite(extent[0]) &amp;&amp; !isNaN(extent[0])) {
+      const center = [(extent[2] + extent[0]) / 2, (extent[3] + extent[1]) / 2];
+      this.gisMap.view.setCenter(center);
+
+      let width = Number(document.getElementById(this.gisMap.mapId).clientWidth);
+      let height = Number(document.getElementById(this.gisMap.mapId).clientHeight);
+
+      const offset = Math.max(extent[2] - extent[0], extent[3] - extent[1]);
+
+      this.gisMap.view.setResolution(offset / (Math.min(width, height) * 0.9));
+    }
+  }
+  /**
+   * 地图工具样式
+   * @param {ol-Feature} feature 要素
+   */
+  filterMapToolStyle(feature) {
+    let me = this.gisMap;
+    let type = feature.getGeometry().getType();
+    // 文字颜色
+    let textColor = P.textColor[this.gisMap.baseMapType];
+    if (type === 'LineString' &amp;&amp; me.toolType === 'measure:LineString') {
+      let text = P.mapToolStyles.label.clone();
+      let tmp = feature.getGeometry().clone().transform('EPSG:4326', 'EPSG:3857').getLength();
+      let length = tmp >= 1000 ? `${Math.round((tmp / 1000) * 100) / 100}公里` : `${Math.round(tmp * 100) / 100}米`;
+      text.setText('总长度：' + length);
+      text.setFill(
+        new Fill({
+          color: textColor,
+        }),
+      );
+      let textStyle = new Style({
+        text: text,
+        geometry: new Point(feature.getGeometry().getLastCoordinate()),
+      });
+      return [textStyle].concat(P.mapToolStyles.sketch);
+    } else if (type === 'Polygon' &amp;&amp; me.toolType === 'measure:Polygon') {
+      let extent = olExtent.boundingExtent(feature.getGeometry().getCoordinates()[0]);
+      let center = olExtent.getCenter(extent);
+      let text = P.mapToolStyles.label.clone();
+      let tmp = feature.getGeometry().clone().transform('EPSG:4326', 'EPSG:3857').getArea();
+      let area =
+        tmp >= 10e5 ? `${Math.round((tmp / 10e5) * 100) / 100}平方公里` : `${Math.round(tmp * 100) / 100}平方米`;
+      text.setText('面积：' + area);
+      text.setFill(
+        new Fill({
+          color: textColor,
+        }),
+      );
+      let textStyle = new Style({
+        text: text,
+        geometry: new Point(center),
+      });
+      return [textStyle].concat(P.mapToolStyles.sketch);
+    } else if (type === 'Point') {
+      return P.mapToolStyles.point;
+    }
+  }
+  destroy() {
+    this.gisMap = undefined;
+  }
+  /**
+   * 计算方位角
+   * @param {Number} lng1 点1经度
+   * @param {Number} lat1 点1纬度
+   * @param {Number} lng2 点2经度
+   * @param {Number} lat2 点2纬度
+   */
+  static calculateAngle(lng1, lat1, lng2, lat2) {
+    let angle = Math.atan((lng2 - lng1) / (lat2 - lat1));
+    if (angle > 0 &amp;&amp; lng2 &lt; lng1) {
+      angle += Math.PI;
+    }
+    if (angle &lt; 0 &amp;&amp; lng2 > lng1) {
+      angle += Math.PI;
+    }
+    if (angle &lt; 0 &amp;&amp; lng2 &lt; lng1) {
+      angle += 2 * Math.PI;
+    }
+    angle = (angle / Math.PI) * 180;
+    return angle;
+  }
+  /**
+   * 绘制canvas图例
+   * @param {Object} props 样式属性
+   * @param {String} fillColor 填充颜色
+   * @param {*} other 其他样式属性
+   */
+  static createCanvasLegend(props, fillColor, other = null) {
+    //画船轮廓
+    let canvas = document.createElement('canvas');
+    let offset = props.strokeWidth;
+    canvas.width = props.width + 2 * offset;
+    canvas.height = props.height + 2 * offset;
+    let ctx = canvas.getContext('2d');
+    ctx.strokeStyle = props.strokeColor;
+    ctx.lineWidth = props.strokeWidth;
+    //船填充颜色改为从数据库中读取，按工区区分
+    ctx.fillStyle = fillColor || props.fill;
+    ctx.beginPath();
+    ctx.moveTo(props.path[0][0] + offset, props.path[0][1] + offset);
+    for (let i = 1; i &lt; props.path.length - 1; i++) {
+      ctx.lineTo(props.path[i][0] + offset, props.path[i][1] + offset);
+    }
+    ctx.lineTo(props.path[props.path.length - 1][0] + offset, props.path[props.path.length - 1][1] + offset);
+    ctx.fill();
+    ctx.stroke();
+
+    if (other) {
+      offset += other.strokeWidth;
+      ctx.strokeStyle = other.strokeColor;
+      ctx.lineWidth = other.strokeWidth;
+      ctx.fillStyle = other.fill;
+      ctx.beginPath();
+      ctx.moveTo(other.path[0][0] + offset, other.path[0][1] + offset);
+      for (let i = 1; i &lt; other.path.length - 1; i++) {
+        ctx.lineTo(other.path[i][0] + offset, other.path[i][1] + offset);
+      }
+      ctx.lineTo(other.path[other.path.length - 1][0] + offset, other.path[other.path.length - 1][1] + offset);
+      ctx.fill();
+      ctx.stroke();
+    }
+    return canvas;
+  }
+  /**
+   * 判断坐标点集是否闭合
+   * @param {Object[]} coordinates [{x,y}] 坐标列表，至少4个点
+   * @param {Number} coordinates[].x x坐标
+   * @param {Number} coordinates[].y y坐标
+   * @returns {Boolean} true:闭合 false:不闭合
+   */
+  static isClosed(coordinates) {
+    if (!Array.isArray(coordinates)) return false;
+    if (coordinates.length &lt; 4) return false;
+    const first = coordinates[0];
+    const last = coordinates[coordinates.length - 1];
+
+    return first.x === last.x &amp;&amp; first.y === last.y;
+  }
+  /**
+   * 释放图层资源
+   * @param {ol-Layer} layer
+   */
+  static disposeLayer(layer) {
+    if (!layer) return;
+
+    if (layer instanceof LayerGroup) {
+      layer.getLayers().forEach((p) => {
+        Tool.disposeLayer(p);
+      });
+    } else {
+      const source = layer.getSource();
+
+      if (source instanceof VectorSource) {
+        source.forEachFeature((feature) => {
+          feature.getGeometry().dispose();
+          feature.dispose();
+        });
+        source.clear();
+      }
+
+      source.dispose();
+    }
+
+    layer.dispose();
+  }
+  /**
+   * 释放要素资源
+   * @param {ol-Feature} feature
+   */
+  static disposeFeature(feature) {
+    feature.getGeometry().dispose();
+    feature.dispose();
+  }
+}
+export default Tool;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+    
+    
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.2</a> on Fri May 05 2023 12:06:24 GMT+0800 (中国标准时间) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/polyfill.js"></script>
+<script src="scripts/linenumber.js"></script>
+
+
+
+</body>
+</html>

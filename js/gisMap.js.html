@@ -29,7 +29,7 @@
 <nav >
     
     
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="GisMap.html">GisMap</a><ul class='methods'><li data-type='method'><a href="GisMap.html#activateMapMeasureTool">activateMapMeasureTool</a></li><li data-type='method'><a href="GisMap.html#closeInfoPopup">closeInfoPopup</a></li><li data-type='method'><a href="GisMap.html#deactivateMapMeasureTool">deactivateMapMeasureTool</a></li><li data-type='method'><a href="GisMap.html#destroy">destroy</a></li><li data-type='method'><a href="GisMap.html#generateBasemap">generateBasemap</a></li><li data-type='method'><a href="GisMap.html#getViewInfo">getViewInfo</a></li><li data-type='method'><a href="GisMap.html#getWindowCenterPosition">getWindowCenterPosition</a></li><li data-type='method'><a href="GisMap.html#setBasemapParams">setBasemapParams</a></li><li data-type='method'><a href="GisMap.html#zoomToHome">zoomToHome</a></li></ul></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="GisMap.html">GisMap</a><ul class='methods'><li data-type='method'><a href="GisMap.html#activateMapMeasureTool">activateMapMeasureTool</a></li><li data-type='method'><a href="GisMap.html#closeInfoPopup">closeInfoPopup</a></li><li data-type='method'><a href="GisMap.html#deactivateMapMeasureTool">deactivateMapMeasureTool</a></li><li data-type='method'><a href="GisMap.html#destroy">destroy</a></li><li data-type='method'><a href="GisMap.html#generateBasemap">generateBasemap</a></li><li data-type='method'><a href="GisMap.html#getViewInfo">getViewInfo</a></li><li data-type='method'><a href="GisMap.html#getWindowCenterPosition">getWindowCenterPosition</a></li><li data-type='method'><a href="GisMap.html#setBasemapParams">setBasemapParams</a></li><li data-type='method'><a href="GisMap.html#zoomToHome">zoomToHome</a></li></ul></li><li><a href="LayerManager.html">LayerManager</a><ul class='methods'><li data-type='method'><a href="LayerManager.html#addLabelToLayer">addLabelToLayer</a></li><li data-type='method'><a href="LayerManager.html#addLayer">addLayer</a></li><li data-type='method'><a href="LayerManager.html#destroy">destroy</a></li><li data-type='method'><a href="LayerManager.html#getLayerVisible">getLayerVisible</a></li><li data-type='method'><a href="LayerManager.html#refreshLayer">refreshLayer</a></li><li data-type='method'><a href="LayerManager.html#removeLayer">removeLayer</a></li><li data-type='method'><a href="LayerManager.html#resetBillboardGeometry">resetBillboardGeometry</a></li><li data-type='method'><a href="LayerManager.html#resetBillboardStyle">resetBillboardStyle</a></li><li data-type='method'><a href="LayerManager.html#resetLabelGeometry">resetLabelGeometry</a></li><li data-type='method'><a href="LayerManager.html#resetLabelStyle">resetLabelStyle</a></li><li data-type='method'><a href="LayerManager.html#resetVectorGeometry">resetVectorGeometry</a></li><li data-type='method'><a href="LayerManager.html#resetVectorStyle">resetVectorStyle</a></li><li data-type='method'><a href="LayerManager.html#setLayerVisibility">setLayerVisibility</a></li><li data-type='method'><a href="LayerManager.html#showLayer">showLayer</a></li><li data-type='method'><a href="LayerManager.html#zoomToLayer">zoomToLayer</a></li></ul></li><li><a href="Tool.html">Tool</a><ul class='methods'><li data-type='method'><a href="Tool.html#centerToExtent">centerToExtent</a></li><li data-type='method'><a href="Tool.html#filterMapToolStyle">filterMapToolStyle</a></li><li data-type='method'><a href="Tool.html#.calculateAngle">calculateAngle</a></li><li data-type='method'><a href="Tool.html#.createCanvasLegend">createCanvasLegend</a></li><li data-type='method'><a href="Tool.html#.disposeFeature">disposeFeature</a></li><li data-type='method'><a href="Tool.html#.disposeLayer">disposeLayer</a></li><li data-type='method'><a href="Tool.html#.isClosed">isClosed</a></li></ul></li></ul>
     
 </nav>
 
@@ -64,38 +64,90 @@ import LayerGroup from 'ol/layer/Group';
 import { transform } from 'ol/proj';
 
 const BasemapProjStr = 'EPSG:3857'; // 地图坐标系通常是3857
-
+/**
+ * 地图类
+ * @class
+ */
 class GisMap {
   /**
-   * 创建GisMap实例
+   * 构造函数
    * @param {Object} config 参数
    * @param {String} config.mapId 地图容器id
    * @param {Function} config.loadMapSuccess 地图加载完成回调
    */
-  constructor({
-    mapId, //地图id
-    loadMapSuccess, //加载完成回调
-  }) {
+  constructor({ mapId, loadMapSuccess }) {
     const me = this;
     activateGcjProject();
 
-    this.map = null; //地图对象
-    this.mapId = mapId; //地图domId
-    this.view = null; //地图视图
+    /**
+     * ol地图对象
+     * @type {ol-Map}
+     */
+    this.map = null;
+    /**
+     * 地图容器id
+     * @type {String}
+     */
+    this.mapId = mapId;
+    /**
+     * 地图视图
+     * @type {ol-View}
+     */
+    this.view = null;
 
-    this.interactiveMeasureLayersrc = null; //交互测量矢量源
-    this.interactiveMeasureLayer = null; //交互测量图层
-    this.interactiveMeasure = null; //交互测量
-    this.toolType = ''; //测量类型
+    /**
+     * 交互测量矢量源
+     * @type {ol-VectorSource}
+     */
+    this.interactiveMeasureLayersrc = null;
+    /**
+     * 交互测量图层
+     * @type {ol-VectorLayer}
+     */
+    this.interactiveMeasureLayer = null;
+    /**
+     * 交互测量
+     * @type {ol-Draw}
+     */
+    this.interactiveMeasure = null;
+    /**
+     * 测量类型
+     * @type {String}
+     * @private
+     */
+    this.toolType = '';
 
-    this.tool = new Tool(this); //工具类
-    this.mapEvtHelper = null; // 地图事件
-    this.mapToolInteraction = null; //地图测量绘制工具
+    /**
+     * 地图工具
+     * @type {Tool}
+     */
+    this.tool = new Tool(this);
 
-    this.infoPopup = null; //信息弹窗
+    /**
+     * 地图事件
+     * @type {MapEvtHelper}
+     * @private
+     */
+    this.mapEvtHelper = null;
+
+    /**
+     * 图层管理
+     * @type {LayerManager}
+     */
+    this.layerManager = null;
+
+    /**
+     * 信息弹窗
+     * @type {ol-Overlay}
+     */
+    this.infoPopup = null;
 
     this.view = new View(P.defaultView);
 
+    /**
+     * 数据是否需要从经纬度转换至墨卡托
+     * @type {Boolean}
+     */
     this.dataNeedTransform = this.view.getProjection().getCode().includes('3857');
 
     // 底图
@@ -131,16 +183,18 @@ class GisMap {
       stopEvent: false,
     });
 
-    //坐标拾取
+    // 坐标拾取弹框
     ele = document.createElement('div');
     ele.id = 'coords-popup';
     ele.style.visibility = 'visible';
 
     this.map.addOverlay(this.infoPopup);
 
-    //地图事件
-    me.mapEvtHelper = new MapEvtHelper(me);
-    me.layerManager = new LayerManager(me);
+    // 地图事件
+    this.mapEvtHelper = new MapEvtHelper(me);
+
+    this.layerManager = new LayerManager(me);
+
     this.map.once('precompose', () => {
       loadMapSuccess();
     });
@@ -303,7 +357,7 @@ export default GisMap;
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.2</a> on Fri May 05 2023 10:26:28 GMT+0800 (中国标准时间) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.2</a> on Fri May 05 2023 12:06:24 GMT+0800 (中国标准时间) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

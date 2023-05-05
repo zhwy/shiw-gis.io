@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>layerManager.js - Documentation</title>
+    
+    
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+    <script src="scripts/nav.js" defer></script>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav >
+    
+    
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="GisMap.html">GisMap</a><ul class='methods'><li data-type='method'><a href="GisMap.html#activateMapMeasureTool">activateMapMeasureTool</a></li><li data-type='method'><a href="GisMap.html#closeInfoPopup">closeInfoPopup</a></li><li data-type='method'><a href="GisMap.html#deactivateMapMeasureTool">deactivateMapMeasureTool</a></li><li data-type='method'><a href="GisMap.html#destroy">destroy</a></li><li data-type='method'><a href="GisMap.html#generateBasemap">generateBasemap</a></li><li data-type='method'><a href="GisMap.html#getViewInfo">getViewInfo</a></li><li data-type='method'><a href="GisMap.html#getWindowCenterPosition">getWindowCenterPosition</a></li><li data-type='method'><a href="GisMap.html#setBasemapParams">setBasemapParams</a></li><li data-type='method'><a href="GisMap.html#zoomToHome">zoomToHome</a></li></ul></li><li><a href="LayerManager.html">LayerManager</a><ul class='methods'><li data-type='method'><a href="LayerManager.html#addLabelToLayer">addLabelToLayer</a></li><li data-type='method'><a href="LayerManager.html#addLayer">addLayer</a></li><li data-type='method'><a href="LayerManager.html#destroy">destroy</a></li><li data-type='method'><a href="LayerManager.html#getLayerVisible">getLayerVisible</a></li><li data-type='method'><a href="LayerManager.html#refreshLayer">refreshLayer</a></li><li data-type='method'><a href="LayerManager.html#removeLayer">removeLayer</a></li><li data-type='method'><a href="LayerManager.html#resetBillboardGeometry">resetBillboardGeometry</a></li><li data-type='method'><a href="LayerManager.html#resetBillboardStyle">resetBillboardStyle</a></li><li data-type='method'><a href="LayerManager.html#resetLabelGeometry">resetLabelGeometry</a></li><li data-type='method'><a href="LayerManager.html#resetLabelStyle">resetLabelStyle</a></li><li data-type='method'><a href="LayerManager.html#resetVectorGeometry">resetVectorGeometry</a></li><li data-type='method'><a href="LayerManager.html#resetVectorStyle">resetVectorStyle</a></li><li data-type='method'><a href="LayerManager.html#setLayerVisibility">setLayerVisibility</a></li><li data-type='method'><a href="LayerManager.html#showLayer">showLayer</a></li><li data-type='method'><a href="LayerManager.html#zoomToLayer">zoomToLayer</a></li></ul></li><li><a href="Tool.html">Tool</a><ul class='methods'><li data-type='method'><a href="Tool.html#centerToExtent">centerToExtent</a></li><li data-type='method'><a href="Tool.html#filterMapToolStyle">filterMapToolStyle</a></li><li data-type='method'><a href="Tool.html#.calculateAngle">calculateAngle</a></li><li data-type='method'><a href="Tool.html#.createCanvasLegend">createCanvasLegend</a></li><li data-type='method'><a href="Tool.html#.disposeFeature">disposeFeature</a></li><li data-type='method'><a href="Tool.html#.disposeLayer">disposeLayer</a></li><li data-type='method'><a href="Tool.html#.isClosed">isClosed</a></li></ul></li></ul>
+    
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">layerManager.js</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/* eslint-disable */
+import Tool from './tool';
+import { LayerType, FontType } from './layerType';
+import VectorLayer from 'ol/layer/Vector';
+import VectorSource from 'ol/source/Vector';
+import Feature from 'ol/Feature';
+import { Point, LineString, Polygon, MultiPolygon, MultiLineString } from 'ol/geom';
+import { Style, Stroke, Text, Fill, IconImage, Icon } from 'ol/style';
+import DrawHelper from './drawHelper';
+import { Default } from './layerType';
+import GisMap from './gisMap';
+
+/**
+ * 图层管理类
+ * @class
+ */
+class LayerManager {
+  /**
+   * 构造函数
+   * @param {GisMap} gisMap
+   */
+  constructor(gisMap) {
+    /**
+     * 地图对象
+     * @type {GisMap}
+     */
+    this.gisMap = gisMap;
+    /**
+     * 地图视图
+     * @type {ol-View}
+     */
+    this.view = gisMap.view;
+
+    /**
+     * 图层id和可见性键值对
+     * @type {Map}
+     */
+    this.layerVisibility = new Map();
+
+    /**
+     * 图层id和图层数据键值对
+     * @type {Map}
+     */
+    this.layerDictionary = new Map();
+
+    /**
+     * 静态矢量图层
+     * @type {ol-VectorLayer}
+     */
+    this.staticItemsVectorLayer = null;
+    /**
+     * 静态矢量图层源
+     * @type {ol-VectorSource}
+     */
+    this.staticItemsVectorLayerSrc = null;
+
+    this.staticItemsVectorLayerSrc = new VectorSource();
+
+    this._filterStyle = this._filterStyle.bind(this);
+    this.staticItemsVectorLayer = new VectorLayer({
+      source: this.staticItemsVectorLayerSrc,
+      className: 'static-layer-manager',
+      style: this._filterStyle,
+    });
+
+    this.gisMap.map.getLayers().insertAt(2, this.staticItemsVectorLayer);
+
+    /**
+     * 绘制工具
+     * @type {DrawHelper}
+     */
+    this.drawHelper = new DrawHelper(gisMap);
+  }
+
+  /**
+   * 添加图层数据
+   * @param {Object[]} layers 图层数据，格式与后台返回的一致
+   */
+  addLayer(layers) {
+    const me = this;
+
+    const features = [];
+    if (!Array.isArray(layers)) {
+      layers = [layers];
+    }
+    layers.forEach((layer) => {
+      // delete layer.geometry; // setProperties后会带上geometry，若不清除几何，添加新几何时会有问题
+      const parentVisible = this.getLayerVisible(layer.parentId);
+      this.setLayerVisibility(layer.id, parentVisible &amp;&amp; layer.check);
+
+      if (layer.type !== LayerType.LayerGroupCollection) {
+        const layerDictItem = {
+          id: layer.id,
+          type: layer.type,
+          isText: layer.isText,
+          isLabel: layer.isLabel,
+        };
+
+        if (layer.layerText) {
+          const text = layer.layerText;
+          const point = new Point([text.lon, text.lat]);
+          this._transformGeometry(point);
+          const feature = new Feature(point);
+
+          const attr = Object.assign({}, text);
+          feature.setProperties(attr);
+          feature.setId(me._getId(text.id));
+          layerDictItem.label = feature;
+          features.push(feature);
+        }
+
+        if (layer.layerLabel) {
+          const icon = layer.layerLabel;
+          const point = new Point([icon.lon, icon.lat]);
+          this._transformGeometry(point);
+          const feature = new Feature(point);
+
+          const attr = Object.assign({}, icon);
+          feature.setProperties(attr);
+          feature.setId(me._getId(icon.id));
+          layerDictItem.icon = feature;
+          features.push(feature);
+        }
+
+        if (layer.layerBorder) {
+          const vector = layer.layerBorder;
+          const geometry = this._generateBorderGeometry(vector);
+          this._transformGeometry(geometry);
+
+          const feature = new Feature(geometry);
+          const attr = Object.assign({}, vector);
+          delete attr.coordinate;
+          delete attr.batchCoordinate;
+          feature.setProperties(attr);
+          feature.setId(me._getId(vector.id));
+
+          layerDictItem.vector = feature;
+          features.push(feature);
+        }
+
+        this.layerDictionary.set(layer.id, layerDictItem);
+      }
+    });
+
+    if (features.length > 0) this.staticItemsVectorLayerSrc.addFeatures(features);
+  }
+
+  /**
+   * 定位到图层
+   * @param {*} layer 图层id或包含图层id的图层数据
+   */
+  zoomToLayer(layer) {
+    const id = layer.id || layer.Id || layer;
+    const layerDictItem = this.layerDictionary.get(id);
+
+    if (!layerDictItem) return;
+
+    let feature, param;
+    switch (layerDictItem.type) {
+      case LayerType.LabelCollection:
+        feature = layerDictItem.label;
+        param = layer.layerText;
+        break;
+      case LayerType.BillboardCollection:
+        feature = layerDictItem.icon;
+        param = layer.layerLabel;
+        break;
+      case LayerType.VectorCollection:
+        feature = layerDictItem.vector;
+        param = layer.layerBorder;
+        break;
+      default:
+        break;
+    }
+
+    if (feature) {
+      const extent = feature.getGeometry().getExtent();
+      if (extent[0] !== Infinity) {
+        this.gisMap.tool.centerToExtent(extent);
+        // 要素是否可见
+        const zoom = this.view.getZoom();
+        if (zoom > param.maxVisibleAlt) {
+          this.view.setZoom(param.maxVisibleAlt);
+        } else if (zoom &lt; param.minVisibleAlt) {
+          this.view.setZoom(param.minVisibleAlt);
+        }
+      }
+    }
+  }
+
+  /**
+   * 控制图层是否可见
+   * @param {Object} layer 图层数据
+   * @param {Boolean|Number|undefined} parentVisible 父图层是否可见。传入undefined时，将从数据中查找父图层可见性。默认undefined
+   */
+  showLayer(layer, parentVisible = undefined) {
+    const me = this;
+    if (parentVisible === undefined) parentVisible = this.getLayerVisible(layer.parentId);
+
+    this.setLayerVisibility(layer.id, layer.check &amp;&amp; parentVisible);
+
+    if (layer.type === LayerType.LayerGroupCollection) {
+      layer.children.forEach((child) => {
+        me.showLayer(child, layer.check &amp;&amp; parentVisible);
+      });
+    } else {
+      const layerDictItem = this.layerDictionary.get(layer.id);
+      layerDictItem.isText = layer.isText;
+    }
+  }
+
+  /**
+   * 设置图层可见性
+   * @param {String} layerid 图层id
+   * @param {Boolean} visible 图层可见性
+   */
+  setLayerVisibility(layerid, visible) {
+    this.layerVisibility.set(layerid, visible);
+
+    this.refreshLayer();
+  }
+
+  /**
+   * 获取图层可见性
+   * @param {String} layerid 图层id
+   * @returns {Boolean} 图层可见性
+   */
+  getLayerVisible(layerid) {
+    const visible = this.layerVisibility.get(layerid);
+    if (visible == undefined) return true;
+    return visible;
+  }
+
+  /**
+   * 刷新图层
+   */
+  refreshLayer() {
+    this.staticItemsVectorLayer.setStyle(this.staticItemsVectorLayer.getStyle());
+  }
+
+  /**
+   * 移除图层
+   * @param {*} layerid 图层id
+   */
+  removeLayer(layerid) {
+    const layerDictItem = this.layerDictionary.get(layerid);
+    if (!layerDictItem) return;
+
+    if (layerDictItem.label) {
+      this.staticItemsVectorLayerSrc.removeFeature(layerDictItem.label);
+      Tool.disposeFeature(layerDictItem.label);
+    }
+
+    if (layerDictItem.icon) {
+      this.staticItemsVectorLayerSrc.removeFeature(layerDictItem.icon);
+      Tool.disposeFeature(layerDictItem.icon);
+    }
+
+    if (layerDictItem.vector) {
+      this.staticItemsVectorLayerSrc.removeFeature(layerDictItem.vector);
+      Tool.disposeFeature(layerDictItem.vector);
+    }
+
+    this.layerDictionary.delete(layerid);
+  }
+
+  /**
+   * 为图层添加文字
+   * @param {Object} param 文字参数，格式与接口返回数据一致
+   */
+  addLabelToLayer(param) {
+    const layerDictItem = this.layerDictionary.get(param.layerId);
+    const feature = new Feature(new Point([param.lon, param.lat]));
+
+    feature.setProperties(Object.assign({}, param));
+    feature.setId(this._getId(param.id));
+
+    Object.assign(layerDictItem, {
+      label: feature,
+      isText: 1,
+    });
+
+    this.staticItemsVectorLayerSrc.addFeature(feature);
+  }
+
+  /**
+   * 重设文字样式
+   * @param {Object} param 文字参数，格式与接口返回数据一致
+   */
+  resetLabelStyle(param) {
+    const layerDictItem = this.layerDictionary.get(param.layerId);
+    const feature = layerDictItem.label;
+    if (feature) {
+      feature.setProperties(Object.assign({}, param));
+    }
+    this.refreshLayer();
+  }
+
+  /**
+   * 重设图标样式
+   * @param {Object} param 图标参数，格式与接口返回数据一致
+   */
+  resetBillboardStyle(param) {
+    const layerDictItem = this.layerDictionary.get(param.layerId);
+    const feature = layerDictItem.icon;
+    if (feature) {
+      feature.setProperties(Object.assign({}, param));
+    }
+    this.refreshLayer();
+  }
+
+  /**
+   * 重设边界样式
+   * @param {Object} param 边界参数，格式与接口返回数据一致
+   */
+  resetVectorStyle(param) {
+    const layerDictItem = this.layerDictionary.get(param.layerId);
+    const feature = layerDictItem.vector;
+    if (feature) {
+      feature.setProperties(Object.assign({}, param));
+    }
+    this.refreshLayer();
+  }
+
+  /**
+   * 重设文字几何
+   * @param {Object} param 文字参数，格式与接口返回数据一致
+   */
+  resetLabelGeometry(param) {
+    const layerDictItem = this.layerDictionary.get(param.layerId);
+    const feature = layerDictItem.label;
+    if (feature) {
+      const geometry = new Point([param.lon, param.lat]);
+      this._transformGeometry(geometry);
+
+      feature.getGeometry().dispose();
+      feature.setGeometry(geometry);
+    }
+  }
+
+  /**
+   * 重设图标几何
+   * @param {Object} param 图标参数，格式与接口返回数据一致
+   */
+  resetBillboardGeometry(param) {
+    const layerDictItem = this.layerDictionary.get(param.layerId);
+    const feature = layerDictItem.icon;
+    if (feature) {
+      const geometry = new Point([param.lon, param.lat]);
+      this._transformGeometry(geometry);
+
+      feature.getGeometry().dispose();
+      feature.setGeometry(geometry);
+    }
+  }
+
+  /**
+   * 重设边界几何
+   * @param {Object} param 边界参数，格式与接口返回数据一致
+   */
+  resetVectorGeometry(param) {
+    const layerDictItem = this.layerDictionary.get(param.layerId);
+    const feature = layerDictItem.vector;
+    if (feature) {
+      const geometry = this._generateBorderGeometry(param);
+      this._transformGeometry(geometry);
+
+      feature.getGeometry().dispose();
+      feature.setGeometry(geometry);
+    }
+  }
+
+  /**
+   * 销毁
+   */
+  destroy() {
+    this.gisMap = undefined;
+    this.view = undefined;
+
+    this.layerVisibility.clear();
+    this.layerVisibility = undefined;
+
+    this.layerDictionary.clear();
+    this.layerDictionary = undefined;
+
+    Tool.disposeLayer(this.staticItemsVectorLayer);
+    this.staticItemsVectorLayer = undefined;
+    this.staticItemsVectorLayerSrc = undefined;
+
+    this.drawHelper.destroy();
+  }
+
+  /**
+   * 投影几何
+   * @param {ol-Geometry} geometry 待投影的几何
+   * @private
+   */
+  _transformGeometry(geometry) {
+    if (this.gisMap.dataNeedTransform) {
+      geometry.transform('EPSG:4326', 'EPSG:3857');
+    }
+  }
+
+  /**
+   * 生成边界几何
+   * @param {Object} layerBorder 边界数据，格式与接口返回数据一致
+   * @returns {ol-Geometry} 边界几何
+   * @private
+   */
+  _generateBorderGeometry(layerBorder) {
+    if (layerBorder.batchCoordinate.length > 0) {
+      const isClosed = Tool.isClosed(layerBorder.batchCoordinate[0]);
+      const coordinates = [];
+      layerBorder.batchCoordinate.forEach((item) => {
+        const itemCoordinates = item.map((p) => {
+          return [p.x, p.y];
+        });
+        if (isClosed) {
+          coordinates.push([itemCoordinates]);
+        } else {
+          coordinates.push(itemCoordinates);
+        }
+      });
+
+      let geometry;
+      if (isClosed) {
+        geometry = new MultiPolygon(coordinates);
+      } else {
+        geometry = new MultiLineString(coordinates);
+      }
+      return geometry;
+    } else {
+      const coordinate = layerBorder.coordinate;
+      const isClosed = Tool.isClosed(coordinate);
+      const coordinates = coordinate.map((p) => {
+        return [p.x, p.y];
+      });
+
+      let geometry;
+      if (isClosed) {
+        geometry = new Polygon([coordinates]);
+      } else {
+        geometry = new LineString(coordinates);
+      }
+      return geometry;
+    }
+  }
+
+  /**
+   * 生成样式
+   * @param {*} feature 要素
+   * @returns {ol-Style} 样式
+   * @private
+   */
+  _filterStyle(feature) {
+    const param = feature.getProperties();
+    const zoom = this.view.getZoom();
+
+    const minLevel = Number(param.minVisibleAlt);
+    const maxLevel = Number(param.maxVisibleAlt);
+
+    const inVisibleRange = zoom >= minLevel &amp;&amp; zoom &lt;= maxLevel;
+
+    const layer = this.layerDictionary.get(param.layerId);
+    if (layer &amp;&amp; this.getLayerVisible(param.layerId) &amp;&amp; inVisibleRange) {
+      if (feature === layer.vector) {
+        return this._getVectorStyle(param);
+      }
+      if (feature === layer.label &amp;&amp; (layer.isText || layer.type === LayerType.LabelCollection)) {
+        return this._getTextStyle(param);
+      }
+      if (feature === layer.icon &amp;&amp; (layer.isLabel || layer.type === LayerType.BillboardCollection)) {
+        return this._getIconStyle(param);
+      }
+    }
+  }
+
+  /**
+   * 边界样式
+   * @param {Object} param 边界样式参数
+   * @returns {ol-Style} 边界样式
+   * @private
+   */
+  _getVectorStyle(param) {
+    const stroke = new Stroke({
+      color: param.borderColor,
+      width: param.borderSize,
+      lineDash: param.isDottedLine === 0 ? null : [param.dottedLineInterval, param.dottedLineInterval],
+    });
+
+    const fill = new Fill({
+      color: param.color,
+    });
+
+    return new Style({
+      fill: param.borderType === 0 ? fill : null,
+      stroke: stroke,
+    });
+  }
+
+  /**
+   * 文字样式
+   * @param {Object} param
+   * @returns {ol-Style} 文字样式
+   * @private
+   */
+  _getTextStyle(param) {
+    const text = new Text({
+      font: `${param.italic ? 'oblique' : ''} ${param.bold ? 'bold' : ''} ${param.size}px ${FontType[param.font]}`,
+      offsetX: param.offsetX,
+      offsetY: -param.offsetY,
+      text: param.content,
+      fill: new Fill({
+        color: param.fontColor,
+      }),
+      stroke:
+        param.isBorder === 1
+          ? new Stroke({
+              color: param.border,
+              width: param.lineWidth,
+            })
+          : null,
+      backgroundFill:
+        param.isBackground === 1
+          ? new Fill({
+              color: param.background,
+            })
+          : null,
+      padding: [param.margin, param.margin, param.margin, param.margin],
+    });
+
+    return new Style({
+      text: text,
+    });
+  }
+
+  /**
+   * 图标样式
+   * @param {*} param
+   * @returns {ol-Style} 图标样式
+   * @private
+   */
+  _getIconStyle(param) {
+    const icon = new Icon({
+      src: param.labelUrl || `data:image/png;base64,${Default.defaultLabelUrl}`,
+      scale: param.size,
+      color: param.color,
+      rotation: (param.rotate / 180) * Math.PI,
+      displacement: [param.offsetX, param.offsetY],
+    });
+
+    return new Style({
+      image: icon,
+    });
+  }
+
+  /**
+   * 生成随机id
+   * @param {*} id
+   * @returns {String}
+   * @private
+   */
+  _getId(id) {
+    if (id === '00000000-0000-0000-0000-000000000000' || !id) {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0,
+          v = c == 'x' ? r : (r &amp; 0x3) | 0x8;
+        return v.toString(16);
+      });
+    }
+
+    return id;
+  }
+}
+
+export default LayerManager;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+    
+    
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.2</a> on Fri May 05 2023 12:06:24 GMT+0800 (中国标准时间) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/polyfill.js"></script>
+<script src="scripts/linenumber.js"></script>
+
+
+
+</body>
+</html>
