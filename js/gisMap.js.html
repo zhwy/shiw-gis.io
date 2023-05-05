@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>gisMap.js - Documentation</title>
+    
+    
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+    <script src="scripts/nav.js" defer></script>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav >
+    
+    
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="GisMap.html">GisMap</a><ul class='methods'><li data-type='method'><a href="GisMap.html#activateMapMeasureTool">activateMapMeasureTool</a></li><li data-type='method'><a href="GisMap.html#closeInfoPopup">closeInfoPopup</a></li><li data-type='method'><a href="GisMap.html#deactivateMapMeasureTool">deactivateMapMeasureTool</a></li><li data-type='method'><a href="GisMap.html#destroy">destroy</a></li><li data-type='method'><a href="GisMap.html#generateBasemap">generateBasemap</a></li><li data-type='method'><a href="GisMap.html#getViewInfo">getViewInfo</a></li><li data-type='method'><a href="GisMap.html#getWindowCenterPosition">getWindowCenterPosition</a></li><li data-type='method'><a href="GisMap.html#setBasemapParams">setBasemapParams</a></li><li data-type='method'><a href="GisMap.html#zoomToHome">zoomToHome</a></li></ul></li></ul>
+    
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">gisMap.js</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import 'ol/ol.css';
+import P from './parameters';
+import Tool from './tool';
+import MapEvtHelper from './mapEvtHelper';
+import LayerManager from './layerManager';
+
+import Map from 'ol/Map';
+import VectorLayer from 'ol/layer/Vector';
+import VectorSource from 'ol/source/Vector';
+import XYZ from 'ol/source/XYZ';
+import Tile from 'ol/layer/Tile';
+import Draw from 'ol/interaction/Draw';
+import { Overlay } from 'ol';
+import { activateGcjProject, gcjMecator } from './projectionHelper';
+import View from 'ol/View';
+import LayerGroup from 'ol/layer/Group';
+import { transform } from 'ol/proj';
+
+const BasemapProjStr = 'EPSG:3857'; // 地图坐标系通常是3857
+
+class GisMap {
+  /**
+   * 创建GisMap实例
+   * @param {Object} config 参数
+   * @param {String} config.mapId 地图容器id
+   * @param {Function} config.loadMapSuccess 地图加载完成回调
+   */
+  constructor({
+    mapId, //地图id
+    loadMapSuccess, //加载完成回调
+  }) {
+    const me = this;
+    activateGcjProject();
+
+    this.map = null; //地图对象
+    this.mapId = mapId; //地图domId
+    this.view = null; //地图视图
+
+    this.interactiveMeasureLayersrc = null; //交互测量矢量源
+    this.interactiveMeasureLayer = null; //交互测量图层
+    this.interactiveMeasure = null; //交互测量
+    this.toolType = ''; //测量类型
+
+    this.tool = new Tool(this); //工具类
+    this.mapEvtHelper = null; // 地图事件
+    this.mapToolInteraction = null; //地图测量绘制工具
+
+    this.infoPopup = null; //信息弹窗
+
+    this.view = new View(P.defaultView);
+
+    this.dataNeedTransform = this.view.getProjection().getCode().includes('3857');
+
+    // 底图
+    this.generateBasemap();
+
+    // 测量
+    this.interactiveMeasureLayersrc = new VectorSource();
+    this.interactiveMeasureLayer = new VectorLayer({
+      source: this.interactiveMeasureLayersrc,
+      className: 'measure-layer',
+      style: (fea) => {
+        return me.tool.filterMapToolStyle(fea);
+      },
+    });
+
+    this.map = new Map({
+      view: this.view,
+      target: this.mapId,
+      controls: [],
+      layers: [this.baseLayer, this.interactiveMeasureLayer],
+      pixelRatio: 1,
+    });
+    // this.map.on('pointermove', this.handlePointerMove);
+
+    //信息弹窗
+    let ele = document.createElement('div');
+    ele.id = 'info-popup';
+    ele.style.visibility = 'visible';
+    this.infoPopup = new Overlay({
+      element: ele,
+      positioning: 'center-right',
+      offset: [-10, 0],
+      stopEvent: false,
+    });
+
+    //坐标拾取
+    ele = document.createElement('div');
+    ele.id = 'coords-popup';
+    ele.style.visibility = 'visible';
+
+    this.map.addOverlay(this.infoPopup);
+
+    //地图事件
+    me.mapEvtHelper = new MapEvtHelper(me);
+    me.layerManager = new LayerManager(me);
+    this.map.once('precompose', () => {
+      loadMapSuccess();
+    });
+
+    window._gismap = this;
+  }
+  /**
+   * 返回默认视角
+   */
+  zoomToHome() {
+    this.view.setCenter(P.defaultView.center);
+    this.view.setZoom(P.defaultView.zoom);
+  }
+
+  /**
+   * 启用交互测量
+   * @param {String} type 测量类型
+   */
+  activateMapMeasureTool(type) {
+    let me = this;
+    me.toolType = `measure:${type}`;
+    this.interactiveMeasureLayersrc.clear();
+    if (this.interactiveMeasure) this.map.removeInteraction(this.interactiveMeasure);
+    this.interactiveMeasure = new Draw({
+      source: this.interactiveMeasureLayersrc,
+      type: type,
+      style: (fea) => {
+        return me.tool.filterMapToolStyle(fea);
+      },
+    });
+    this.interactiveMeasure.on('drawstart', () => {
+      me.interactiveMeasureLayersrc.clear(); //清除上一次测量结果
+    });
+    this.map.addInteraction(this.interactiveMeasure);
+  }
+  /**
+   * 停用交互测量
+   */
+  deactivateMapMeasureTool() {
+    this.interactiveMeasureLayersrc.clear();
+    if (this.interactiveMeasure) this.map.removeInteraction(this.interactiveMeasure);
+  }
+  /**
+   * 移除hover弹框
+   */
+  closeInfoPopup() {
+    this.infoPopup.setPosition(null);
+  }
+  /**
+   *创建底图
+   */
+  generateBasemap() {
+    const config = P.basemapConfig;
+
+    const generateLayer = (c) => {
+      let projection = BasemapProjStr;
+
+      if (c.url?.includes('autonavi')) {
+        projection = gcjMecator;
+      }
+
+      const sourceConstructor = c.sourceConstructor || XYZ;
+      const params = { ...c };
+      params.projection = projection;
+
+      return new Tile({
+        source: new sourceConstructor(params),
+      });
+    };
+
+    if (Array.isArray(config)) {
+      const layers = config.map((c) => generateLayer(c));
+      this.baseLayer = new LayerGroup({ layers });
+    } else {
+      this.baseLayer = generateLayer(config);
+    }
+  }
+  /**
+   * 切换底图
+   * @param {Object} config 底图配置
+   */
+  setBasemapParams(config) {
+    P.basemapConfig = config;
+
+    const layers = this.map.getLayers();
+    layers.removeAt(0);
+
+    this.generateBasemap();
+    layers.insertAt(0, this.baseLayer);
+  }
+  /**
+   * 获取屏幕中心坐标
+   */
+  getWindowCenterPosition() {
+    let center = this.view.getCenter();
+    if (this.dataNeedTransform) {
+      center = transform(center, 'EPSG:3857', 'EPSG:4326');
+    }
+
+    const [lon, lat] = center;
+    return {
+      lon: Math.round(lon * 1e6) / 1e6,
+      lat: Math.round(lat * 1e6) / 1e6,
+      alt: 0,
+    };
+  }
+  /**
+   * 获取视角参数
+   */
+  getViewInfo() {
+    let center = this.view.getCenter();
+    const proj = this.view.getProjection().getCode();
+    if (proj.includes('3857')) {
+      center = transform(center, 'EPSG:3857', 'EPSG:4326');
+    }
+
+    return {
+      center: center,
+      zoom: this.view.getZoom(),
+    };
+  }
+  /**
+   * 销毁地图
+   */
+  destroy() {
+    window._gismap = undefined;
+
+    if (this.mapEvtHelper) this.mapEvtHelper.destroy();
+    if (this.fenceHelper) this.fenceHelper.destroy();
+    if (this.layerManager) this.layerManager.destroy();
+    if (this.animationHelper) this.animationHelper.destroy();
+
+    if (this.tool) this.tool.destroy();
+
+    this.view = undefined; //地图视图
+
+    Tool.disposeLayer(this.interactiveMeasureLayer);
+    this.interactiveMeasureLayersrc = undefined;
+    this.interactiveMeasureLayer = undefined;
+
+    this.tool = undefined;
+    this.mapEvtHelper = undefined;
+
+    this.map = undefined;
+    window._gismap = undefined;
+  }
+}
+export default GisMap;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+    
+    
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.2</a> on Fri May 05 2023 09:10:16 GMT+0800 (中国标准时间) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/polyfill.js"></script>
+<script src="scripts/linenumber.js"></script>
+
+
+
+</body>
+</html>
